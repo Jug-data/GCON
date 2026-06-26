@@ -16,7 +16,7 @@ import subprocess
 import hashlib
 import psutil
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
 
@@ -84,6 +84,9 @@ class GCONAgent:
                 }
                 logger.info(f"GPU detected: {gpu.name} ({gpu.memoryTotal}MB)")
                 return gpu_info
+            logger.info("No GPU detected. Using fallback GPU detection.")
+            return self._fallback_gpu_detection()
+            
         except ImportError:
             logger.warning("GPUtil not installed. Using fallback GPU detection.")
             return self._fallback_gpu_detection()
@@ -119,7 +122,7 @@ class GCONAgent:
             cpu_percent=psutil.cpu_percent(interval=0.1),
             memory_percent=psutil.virtual_memory().percent,
             runtime_seconds=time.time() - self.start_time if self.start_time else 0,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.now(UTC).isoformat()
         )
         self.metrics.append(metrics)
         return metrics
@@ -170,7 +173,7 @@ class GCONAgent:
                 "stdout": stdout,
                 "stderr": stderr,
                 "metrics": final_metrics.to_dict(),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
             
             logger.info(f"Job completed in {runtime:.2f}s with return code {self.process.returncode}")
@@ -195,7 +198,7 @@ class GCONAgent:
                 "status": "error",
                 "runtime_seconds": self.end_time - self.start_time,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
     
     def get_metrics_summary(self) -> Dict[str, Any]:
