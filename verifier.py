@@ -1,1 +1,242 @@
-"""\nGCON Verifier - Cryptographic verification and proof generation.\n\nThe verifier:\n1. Hashes inputs and outputs\n2. Creates cryptographic signatures\n3. Validates execution receipts\n4. Generates proof of work\n"""\n\nimport hashlib\nimport json\nimport hmac\nfrom datetime import datetime\nfrom typing import Dict, Any, Optional, Tuple\nimport logging\n\nlogger = logging.getLogger(__name__)\n\n\nclass ExecutionVerifier:\n    \"\"\"Verifies execution and generates cryptographic proofs.\"\"\"\n    \n    def __init__(self, secret_key: Optional[str] = None):\n        \"\"\"\n        Initialize ExecutionVerifier.\n        \n        Args:\n            secret_key: Secret key for HMAC signing (optional)\n        \"\"\"\n        self.secret_key = secret_key or \"gcon-default-key\"\n        logger.info(\"ExecutionVerifier initialized\")\n    \n    @staticmethod\n    def hash_data(data: Any, algorithm: str = \"sha256\") -> str:\n        \"\"\"\n        Generate cryptographic hash of data.\n        \n        Args:\n            data: Data to hash (string or dict)\n            algorithm: Hash algorithm to use\n            \n        Returns:\n            Hex digest of hash\n        \"\"\"\n        if isinstance(data, dict):\n            data = json.dumps(data, sort_keys=True)\n        \n        if isinstance(data, str):\n            data = data.encode()\n        \n        if algorithm == \"sha256\":\n            return hashlib.sha256(data).hexdigest()\n        elif algorithm == \"sha512\":\n            return hashlib.sha512(data).hexdigest()\n        else:\n            return hashlib.sha256(data).hexdigest()\n    \n    @staticmethod\n    def hash_file(filepath: str, algorithm: str = \"sha256\", chunk_size: int = 65536) -> str:\n        \"\"\"\n        Generate hash of a file.\n        \n        Args:\n            filepath: Path to file to hash\n            algorithm: Hash algorithm to use\n            chunk_size: Chunk size for reading large files\n            \n        Returns:\n            Hex digest of file hash\n        \"\"\"\n        if algorithm == \"sha256\":\n            hasher = hashlib.sha256()\n        elif algorithm == \"sha512\":\n            hasher = hashlib.sha512()\n        else:\n            hasher = hashlib.sha256()\n        \n        try:\n            with open(filepath, 'rb') as f:\n                while True:\n                    chunk = f.read(chunk_size)\n                    if not chunk:\n                        break\n                    hasher.update(chunk)\n            return hasher.hexdigest()\n        except FileNotFoundError:\n            logger.error(f\"File not found: {filepath}\")\n            return \"\"\n    \n    def sign_data(self, data: Dict[str, Any]) -> str:\n        \"\"\"\n        Create HMAC signature of data.\n        \n        Args:\n            data: Data to sign\n            \n        Returns:\n            Hex digest of HMAC signature\n        \"\"\"\n        message = json.dumps(data, sort_keys=True).encode()\n        signature = hmac.new(\n            self.secret_key.encode(),\n            message,\n            hashlib.sha256\n        ).hexdigest()\n        return signature\n    \n    def verify_signature(self, data: Dict[str, Any], signature: str) -> bool:\n        \"\"\"\n        Verify HMAC signature of data.\n        \n        Args:\n            data: Data to verify\n            signature: Expected signature\n            \n        Returns:\n            True if signature is valid\n        \"\"\"\n        computed_signature = self.sign_data(data)\n        return hmac.compare_digest(computed_signature, signature)\n    \n    def generate_execution_proof(\n        self,\n        job_id: str,\n        gpu_name: str,\n        runtime: float,\n        input_hash: str,\n        output_hash: str,\n        metrics: Optional[Dict[str, Any]] = None\n    ) -> Dict[str, Any]:\n        \"\"\"\n        Generate execution proof receipt.\n        \n        Args:\n            job_id: Unique job identifier\n            gpu_name: GPU used for execution\n            runtime: Execution time in seconds\n            input_hash: Hash of input data\n            output_hash: Hash of output data\n            metrics: Execution metrics\n            \n        Returns:\n            Proof dictionary with signature\n        \"\"\"\n        proof_data = {\n            \"job_id\": job_id,\n            \"gpu\": gpu_name,\n            \"runtime_seconds\": runtime,\n            \"input_hash\": input_hash,\n            \"output_hash\": output_hash,\n            \"timestamp\": datetime.utcnow().isoformat(),\n            \"metrics\": metrics or {}\n        }\n        \n        signature = self.sign_data(proof_data)\n        \n        proof = {\n            **proof_data,\n            \"signature\": signature,\n            \"verified\": True\n        }\n        \n        logger.info(f\"Execution proof generated for job {job_id}\")\n        return proof\n    \n    def validate_proof(self, proof: Dict[str, Any]) -> Tuple[bool, str]:\n        \"\"\"\n        Validate execution proof.\n        \n        Args:\n            proof: Proof dictionary to validate\n            \n        Returns:\n            Tuple of (is_valid, message)\n        \"\"\"\n        if \"signature\" not in proof:\n            return False, \"Proof missing signature\"\n        \n        signature = proof[\"signature\"]\n        proof_copy = {k: v for k, v in proof.items() if k != \"signature\"}\n        \n        if not self.verify_signature(proof_copy, signature):\n            return False, \"Invalid signature\"\n        \n        # Check timestamp is recent (within 24 hours)\n        try:\n            timestamp = datetime.fromisoformat(proof.get(\"timestamp\", \"\"))\n            now = datetime.utcnow()\n            diff = (now - timestamp).total_seconds()\n            if diff > 86400:  # 24 hours\n                return False, \"Proof timestamp is too old\"\n        except (ValueError, TypeError):\n            return False, \"Invalid timestamp format\"\n        \n        return True, \"Proof is valid\"\n    \n    def create_receipt(\n        self,\n        job_id: str,\n        agent_id: str,\n        execution_result: Dict[str, Any],\n        input_hash: str,\n        output_hash: str\n    ) -> Dict[str, Any]:\n        \"\"\"\n        Create a complete execution receipt.\n        \n        Args:\n            job_id: Job identifier\n            agent_id: Agent identifier\n            execution_result: Result from agent execution\n            input_hash: Hash of input\n            output_hash: Hash of output\n            \n        Returns:\n            Complete receipt with proof\n        \"\"\"\n        receipt = {\n            \"receipt_id\": self.hash_data(f\"{job_id}-{datetime.utcnow().isoformat()}\")[:16],\n            \"job_id\": job_id,\n            \"agent_id\": agent_id,\n            \"status\": execution_result.get(\"status\", \"unknown\"),\n            \"input_hash\": input_hash,\n            \"output_hash\": output_hash,\n            \"proof\": self.generate_execution_proof(\n                job_id=job_id,\n                gpu_name=execution_result.get(\"metrics\", {}).get(\"gpu_name\", \"Unknown\"),\n                runtime=execution_result.get(\"runtime_seconds\", 0),\n                input_hash=input_hash,\n                output_hash=output_hash,\n                metrics=execution_result.get(\"metrics\", {})\n            ),\n            \"issued_at\": datetime.utcnow().isoformat()\n        }\n        \n        logger.info(f\"Receipt created: {receipt['receipt_id']} for job {job_id}\")\n        return receipt\
+"""
+GCON Verifier - Cryptographic verification and proof generation.
+
+The verifier:
+1. Hashes inputs and outputs
+2. Creates cryptographic signatures
+3. Validates execution receipts
+4. Generates proof of work
+"""
+
+import hashlib
+import json
+import hmac
+from datetime import datetime
+from typing import Dict, Any, Optional, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ExecutionVerifier:
+    """Verifies execution and generates cryptographic proofs."""
+    
+    def __init__(self, secret_key: Optional[str] = None):
+        """
+        Initialize ExecutionVerifier.
+        
+        Args:
+            secret_key: Secret key for HMAC signing (optional)
+        """
+        self.secret_key = secret_key or "gcon-default-key"
+        logger.info("ExecutionVerifier initialized")
+    
+    @staticmethod
+    def hash_data(data: Any, algorithm: str = "sha256") -> str:
+        """
+        Generate cryptographic hash of data.
+        
+        Args:
+            data: Data to hash (string or dict)
+            algorithm: Hash algorithm to use
+            
+        Returns:
+            Hex digest of hash
+        """
+        if isinstance(data, dict):
+            data = json.dumps(data, sort_keys=True)
+        
+        if isinstance(data, str):
+            data = data.encode()
+        
+        if algorithm == "sha256":
+            return hashlib.sha256(data).hexdigest()
+        elif algorithm == "sha512":
+            return hashlib.sha512(data).hexdigest()
+        else:
+            return hashlib.sha256(data).hexdigest()
+    
+    @staticmethod
+    def hash_file(filepath: str, algorithm: str = "sha256", chunk_size: int = 65536) -> str:
+        """
+        Generate hash of a file.
+        
+        Args:
+            filepath: Path to file to hash
+            algorithm: Hash algorithm to use
+            chunk_size: Chunk size for reading large files
+            
+        Returns:
+            Hex digest of file hash
+        """
+        if algorithm == "sha256":
+            hasher = hashlib.sha256()
+        elif algorithm == "sha512":
+            hasher = hashlib.sha512()
+        else:
+            hasher = hashlib.sha256()
+        
+        try:
+            with open(filepath, 'rb') as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+            return hasher.hexdigest()
+        except FileNotFoundError:
+            logger.error(f"File not found: {filepath}")
+            return ""
+    
+    def sign_data(self, data: Dict[str, Any]) -> str:
+        """
+        Create HMAC signature of data.
+        
+        Args:
+            data: Data to sign
+            
+        Returns:
+            Hex digest of HMAC signature
+        """
+        message = json.dumps(data, sort_keys=True).encode()
+        signature = hmac.new(
+            self.secret_key.encode(),
+            message,
+            hashlib.sha256
+        ).hexdigest()
+        return signature
+    
+    def verify_signature(self, data: Dict[str, Any], signature: str) -> bool:
+        """
+        Verify HMAC signature of data.
+        
+        Args:
+            data: Data to verify
+            signature: Expected signature
+            
+        Returns:
+            True if signature is valid
+        """
+        computed_signature = self.sign_data(data)
+        return hmac.compare_digest(computed_signature, signature)
+    
+    def generate_execution_proof(
+        self,
+        job_id: str,
+        gpu_name: str,
+        runtime: float,
+        input_hash: str,
+        output_hash: str,
+        metrics: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate execution proof receipt.
+        
+        Args:
+            job_id: Unique job identifier
+            gpu_name: GPU used for execution
+            runtime: Execution time in seconds
+            input_hash: Hash of input data
+            output_hash: Hash of output data
+            metrics: Execution metrics
+            
+        Returns:
+            Proof dictionary with signature
+        """
+        proof_data = {
+            "job_id": job_id,
+            "gpu": gpu_name,
+            "runtime_seconds": runtime,
+            "input_hash": input_hash,
+            "output_hash": output_hash,
+            "timestamp": datetime.utcnow().isoformat(),
+            "metrics": metrics or {}
+        }
+        
+        signature = self.sign_data(proof_data)
+        
+        proof = {
+            **proof_data,
+            "signature": signature,
+            "verified": True
+        }
+        
+        logger.info(f"Execution proof generated for job {job_id}")
+        return proof
+    
+    def validate_proof(self, proof: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Validate execution proof.
+        
+        Args:
+            proof: Proof dictionary to validate
+            
+        Returns:
+            Tuple of (is_valid, message)
+        """
+        if "signature" not in proof:
+            return False, "Proof missing signature"
+        
+        signature = proof["signature"]
+        proof_copy = {
+    k: v
+    for k, v in proof.items()
+    if k not in ("signature", "verified")
+}
+        
+        if not self.verify_signature(proof_copy, signature):
+            return False, "Invalid signature"
+        
+        # Check timestamp is recent (within 24 hours)
+        try:
+            timestamp = datetime.fromisoformat(proof.get("timestamp", ""))
+            now = datetime.utcnow()
+            diff = (now - timestamp).total_seconds()
+            if diff > 86400:  # 24 hours
+                return False, "Proof timestamp is too old"
+        except (ValueError, TypeError):
+            return False, "Invalid timestamp format"
+        
+        return True, "Proof is valid"
+    
+    def create_receipt(
+        self,
+        job_id: str,
+        agent_id: str,
+        execution_result: Dict[str, Any],
+        input_hash: str,
+        output_hash: str
+    ) -> Dict[str, Any]:
+        """
+        Create a complete execution receipt.
+        
+        Args:
+            job_id: Job identifier
+            agent_id: Agent identifier
+            execution_result: Result from agent execution
+            input_hash: Hash of input
+            output_hash: Hash of output
+            
+        Returns:
+            Complete receipt with proof
+        """
+        receipt = {
+            "receipt_id": self.hash_data(f"{job_id}-{datetime.utcnow().isoformat()}")[:16],
+            "job_id": job_id,
+            "agent_id": agent_id,
+            "status": execution_result.get("status", "unknown"),
+            "input_hash": input_hash,
+            "output_hash": output_hash,
+            "proof": self.generate_execution_proof(
+                job_id=job_id,
+                gpu_name=execution_result.get("metrics", {}).get("gpu_name", "Unknown"),
+                runtime=execution_result.get("runtime_seconds", 0),
+                input_hash=input_hash,
+                output_hash=output_hash,
+                metrics=execution_result.get("metrics", {})
+            ),
+            "issued_at": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"Receipt created: {receipt['receipt_id']} for job {job_id}")
+        return receipt
