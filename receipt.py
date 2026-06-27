@@ -8,7 +8,8 @@ The receipt system:
 4. Validates receipt authenticity
 """
 
-import json
+import base64
+from key_manager import KeyManager
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -196,9 +197,36 @@ class ReceiptGenerator:
             "stdout": execution_result.get("stdout"),
             "stderr": execution_result.get("stderr")
         }
-        receipt["receipt_hash"] = compute_receipt_hash(receipt) 
+        receipt["receipt_hash"] = compute_receipt_hash(receipt)
+
+        signer = ReceiptSigner()
+        receipt = signer.sign(receipt)
 
         return receipt
+        
+class ReceiptSigner:
+    """Signs execution receipts using Ed25519."""
+
+    def __init__(self):
+        self.key_manager = KeyManager()
+
+    def sign(self, receipt: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Sign a receipt using its receipt_hash.
+        """
+        private_key = self.key_manager.load_private_key()
+
+        receipt_hash = receipt["receipt_hash"]
+
+        signature = private_key.sign(
+            receipt_hash.encode("utf-8")
+        )
+
+        receipt["signature"] = base64.b64encode(signature).decode("utf-8")
+        receipt["signer"] = "gcon-agent-001"
+
+        return receipt
+
 
 class ReceiptVerifier:
     """Verifies the integrity of execution receipts."""
@@ -218,7 +246,15 @@ class ReceiptVerifier:
         if not stored_hash:
             return False
 
-        calculated_hash = compute_receipt_hash(receipt)
+        # Work on a copy so the original receipt is unchanged
+        receipt_copy = receipt.copy()
+
+        # Remove fields that are not part of the hash
+        receipt_copy.pop("receipt_hash", None)
+        receipt_copy.pop("signature", None)
+        receipt_copy.pop("signer", None)
+
+        calculated_hash = compute_receipt_hash(receipt_copy)
 
         return stored_hash == calculated_hash
 
