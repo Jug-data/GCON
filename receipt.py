@@ -15,7 +15,31 @@ from typing import Dict, Any, Optional, List
 import logging
 
 logger = logging.getLogger(__name__)
+import json
 
+def canonicalize_receipt(receipt: dict) -> bytes:
+    """
+    Convert a receipt into a deterministic JSON byte representation.
+    """
+    return json.dumps(
+        receipt,
+        sort_keys=True,
+        separators=(",", ":")
+    ).encode("utf-8")
+
+import hashlib
+
+def compute_receipt_hash(receipt: dict) -> str:
+    """
+    Compute the SHA-256 hash of a receipt.
+
+    The receipt_hash field is excluded so the hash is stable.
+    """
+    receipt_copy = dict(receipt)
+    receipt_copy.pop("receipt_hash", None)
+
+    canonical = canonicalize_receipt(receipt_copy)
+    return hashlib.sha256(canonical).hexdigest()
 
 class ReceiptManager:
     """Manages execution receipts."""
@@ -135,6 +159,68 @@ class ReceiptManager:
             logger.error(f"Failed to delete receipt {receipt_id}: {e}")
             return False
 
+import uuid
+import hashlib
+
+class ReceiptGenerator:
+    """Generates execution receipts from agent results."""
+
+    @staticmethod
+    def generate(execution_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate a GCON execution receipt.
+
+        Args:
+            execution_result: Result returned by GCONAgent.execute_job()
+
+        Returns:
+            Receipt dictionary
+        """
+
+        metrics = execution_result.get("metrics", {})
+
+        receipt = {
+            "receipt_id": str(uuid.uuid4()),
+            "job_id": execution_result.get("job_id"),
+            "status": execution_result.get("status"),
+            "issued_at": execution_result.get("timestamp"),
+
+            "proof": {
+                "gpu": metrics.get("gpu_name"),
+                "runtime_seconds": metrics.get("runtime_seconds"),
+                "cpu_percent": metrics.get("cpu_percent"),
+                "memory_percent": metrics.get("memory_percent"),
+                "verified": False
+            },
+
+            "stdout": execution_result.get("stdout"),
+            "stderr": execution_result.get("stderr")
+        }
+        receipt["receipt_hash"] = compute_receipt_hash(receipt) 
+
+        return receipt
+
+class ReceiptVerifier:
+    """Verifies the integrity of execution receipts."""
+
+    @staticmethod
+    def verify(receipt: Dict[str, Any]) -> bool:
+        """
+        Verify the integrity of a receipt.
+
+        Returns:
+            True if valid.
+            False if the receipt has been modified.
+        """
+
+        stored_hash = receipt.get("receipt_hash")
+
+        if not stored_hash:
+            return False
+
+        calculated_hash = compute_receipt_hash(receipt)
+
+        return stored_hash == calculated_hash
 
 class ReceiptFormatter:
     """Formats receipts for display and export."""

@@ -16,7 +16,12 @@ from datetime import datetime
 
 from agent import GCONAgent, ExecutionMetrics
 from verifier import ExecutionVerifier
-from receipt import ReceiptManager, ReceiptFormatter
+from receipt import (
+    ReceiptManager,
+    ReceiptFormatter,
+    ReceiptGenerator,
+    ReceiptVerifier,
+)
 from run_job import JobRunner
 
 
@@ -241,6 +246,54 @@ class TestReceiptFormatter(unittest.TestCase):
         self.assertIn("job-001", summary)
         self.assertIn("RTX 4090", summary)
 
+class TestReceiptVerifier(unittest.TestCase):
+    """Test ReceiptVerifier functionality."""
+
+    def setUp(self):
+        """Create a sample execution result."""
+        self.execution_result = {
+            "job_id": "job-001",
+            "status": "completed",
+            "timestamp": datetime.utcnow().isoformat(),
+            "stdout": "hello world",
+            "stderr": "",
+            "metrics": {
+                "gpu_name": "RTX 4090",
+                "runtime_seconds": 1.25,
+                "cpu_percent": 15.0,
+                "memory_percent": 25.0,
+            },
+        }
+
+    def test_valid_receipt_verifies(self):
+        """A newly generated receipt should verify."""
+        receipt = ReceiptGenerator.generate(self.execution_result)
+
+        self.assertTrue(ReceiptVerifier.verify(receipt))
+
+    def test_modified_receipt_fails(self):
+        """Changing the receipt should invalidate it."""
+        receipt = ReceiptGenerator.generate(self.execution_result)
+
+        receipt["stdout"] = "tampered output"
+
+        self.assertFalse(ReceiptVerifier.verify(receipt))
+
+    def test_missing_hash_fails(self):
+        """Receipt without a hash should fail verification."""
+        receipt = ReceiptGenerator.generate(self.execution_result)
+
+        receipt.pop("receipt_hash")
+
+        self.assertFalse(ReceiptVerifier.verify(receipt))
+
+    def test_corrupted_hash_fails(self):
+        """Receipt with an incorrect hash should fail verification."""
+        receipt = ReceiptGenerator.generate(self.execution_result)
+
+        receipt["receipt_hash"] = "0" * 64
+
+        self.assertFalse(ReceiptVerifier.verify(receipt))
 
 class TestJobRunner(unittest.TestCase):
     """Test JobRunner functionality."""
