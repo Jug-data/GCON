@@ -1,18 +1,24 @@
+
+import json
+
 class PolicyEngine:
-    """Evaluates validated receipts against GCON policy rules."""
 
-    def __init__(self):
-        """
-        Default GCON policy limits.
-        """
+    def __init__(self, policy_file="policy.json"):
+        """Load policy configuration."""
 
-        self.policy = {
-        "max_runtime": 30.0,
-        "max_cpu_percent": 90.0,
-        "max_memory_percent": 95.0,
-        "require_gpu": False
-    } # seconds
+        default_policy = {
+            "version": "1.0",
+            "max_runtime": 30.0,
+            "max_cpu_percent": 90.0,
+            "max_memory_percent": 95.0,
+            "require_gpu": False
+        }
 
+        try:
+            with open(policy_file, "r") as file:
+                self.policy = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            self.policy = default_policy
     def check_runtime(self, receipt):
         """
         Check whether the runtime satisfies the policy.
