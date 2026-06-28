@@ -41,6 +41,23 @@ class ReceiptValidator:
 
         return True, "Proof present"
 
+
+    def validate_metrics(self, receipt):
+        """
+        Validate that the receipt contains execution metrics.
+        """
+
+        proof = receipt.get("proof", {})
+        metrics = proof.get("metrics")
+
+        if metrics is None:
+            return False, "Metrics missing"
+
+        if not isinstance(metrics, dict):
+            return False, "Metrics are invalid"
+
+        return True, "Metrics present"
+    
     def validate(self, receipt):
         """
         Validate a receipt and return a validation report.
@@ -56,7 +73,9 @@ class ReceiptValidator:
             ("Job ID", self.validate_job_id),
             ("Agent ID", self.validate_agent_id),
             ("Proof", self.validate_proof),
+            ("Metrics", self.validate_metrics),
         ]
+        
 
         for name, check in checks:
             passed, message = check(receipt)
