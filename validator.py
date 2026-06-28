@@ -44,8 +44,7 @@ class ReceiptValidator:
 
     def validate_metrics(self, receipt):
         """
-        Validate that the receipt contains execution metrics.
-        """
+        Validate execution metrics."""
 
         proof = receipt.get("proof", {})
         metrics = proof.get("metrics")
@@ -56,7 +55,28 @@ class ReceiptValidator:
         if not isinstance(metrics, dict):
             return False, "Metrics are invalid"
 
-        return True, "Metrics present"
+        cpu = metrics.get("cpu_percent")
+        memory = metrics.get("memory_percent")
+        runtime = metrics.get("runtime_seconds")
+        gpu_total = metrics.get("gpu_memory_total")
+        gpu_used = metrics.get("gpu_memory_used")
+
+        if cpu is None or not (0 <= cpu <= 100):
+            return False, "Invalid CPU percentage"
+
+        if memory is None or not (0 <= memory <= 100):
+            return False, "Invalid memory percentage"
+
+        if runtime is None or runtime <= 0:
+            return False, "Invalid runtime"
+
+        if gpu_total is None or gpu_used is None:
+            return False, "GPU metrics missing"
+
+        if gpu_used > gpu_total:
+            return False, "GPU memory usage exceeds total memory"
+
+        return True, "Metrics valid"
     
     def validate(self, receipt):
         """
