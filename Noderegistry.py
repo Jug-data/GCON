@@ -1,3 +1,4 @@
+from datetime import datetime, UTC, timedelta
 class NodeRegistry:
     """
     Stores and manages GCON nodes.
@@ -5,6 +6,7 @@ class NodeRegistry:
 
     def __init__(self):
         self.nodes = {}
+        self.timeout = timedelta(seconds=10)
         
     def register(self, node):
         """
@@ -14,7 +16,13 @@ class NodeRegistry:
         if node.node_id in self.nodes:
             raise ValueError(f"Node '{node.node_id}' already exists.")
 
-        self.nodes[node.node_id] = node
+        from datetime import datetime, UTC
+
+        self.nodes[node.node_id] = {
+            "node": node,
+            "last_seen": datetime.now(UTC),
+            "status": node.status
+    }
         
     def remove(self, node_id):
         """
@@ -34,7 +42,7 @@ class NodeRegistry:
         if node_id not in self.nodes:
              raise ValueError(f"Node '{node_id}' does not exist.")
 
-        return self.nodes[node_id]
+        return self.nodes[node_id]["node"]
     
     def list_nodes(self):
         """
@@ -49,8 +57,47 @@ class NodeRegistry:
         """
 
         return [     
+        
+        info["node"]
+        for info in self.nodes.values()
+        if info["status"] == "idle"
+]
+        
+    def get_node_info(self, node_id):
+        """
+        Return the complete registry information for a node.
+        """
+
+        if node_id not in self.nodes:
+            raise ValueError(f"Node '{node_id}' does not exist.")
+
+        return self.nodes[node_id]
+    
+    from datetime import datetime, UTC
+
+    def heartbeat(self, node_id, status):
+        """
+        Update heartbeat information for a node.
+        """
+
+        if node_id not in self.nodes:
+            raise ValueError(f"Node '{node_id}' does not exist.")
+
+        self.nodes[node_id]["last_seen"] = datetime.now(UTC)
+        self.nodes[node_id]["status"] = status
+        
+    def check_node_health(self):
+        """
+        Mark nodes as offline if they have not sent
+        a heartbeat within the timeout.
+        """
+
+        now = datetime.now(UTC)
+
+        for info in self.nodes.values():
+
+            elapsed = now - info["last_seen"]
+
+            if elapsed > self.timeout:
+                info["status"] = "offline"
             
-        node
-        for node in self.nodes.values()
-        if node.status == "idle"
-    ]

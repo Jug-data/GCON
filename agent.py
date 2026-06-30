@@ -19,8 +19,8 @@ import logging
 from datetime import datetime, UTC
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
+from datetime import datetime, UTC
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -47,19 +47,22 @@ class ExecutionMetrics:
 class GCONAgent:
     """Main GCON Agent for executing verified workloads."""
     
-    def __init__(self, job_id: str):
+    def __init__(self, node_id: str):
         """
         Initialize GCON Agent.
         
         Args:
-            job_id: Unique identifier for the job
+        job_id: Unique identifier for the job
         """
-        self.job_id = job_id
+        self.node_id= node_id
+        self.job_id = node_id
+        self.status ="idle"
+        
         self.start_time = None
         self.end_time = None
         self.metrics = []
         self.process = None
-        logger.info(f"GCON Agent initialized for job {job_id}")
+        logger.info(f"GCON Agent initialized for node {node_id}")
     
     def detect_gpu(self) -> Dict[str, Any]:
         """
@@ -140,6 +143,7 @@ class GCONAgent:
         """
         logger.info(f"Starting job execution: {job_script}")
         self.start_time = time.time()
+        self.status = "busy"
         
         try:
             # Determine if it's a file or command
@@ -177,12 +181,14 @@ class GCONAgent:
             }
             
             logger.info(f"Job completed in {runtime:.2f}s with return code {self.process.returncode}")
+            self.status = "idle"
             return result
             
         except subprocess.TimeoutExpired:
             logger.error(f"Job timeout after {timeout}s")
             self.process.kill()
             self.end_time = time.time()
+            self.status = "idle"
             return {
                 "job_id": self.job_id,
                 "status": "timeout",
@@ -193,6 +199,7 @@ class GCONAgent:
         except Exception as e:
             logger.error(f"Job execution failed: {e}")
             self.end_time = time.time()
+            self.status = "idle"
             return {
                 "job_id": self.job_id,
                 "status": "error",
@@ -214,3 +221,22 @@ class GCONAgent:
             "avg_cpu_percent": sum(m.cpu_percent for m in self.metrics) / len(self.metrics),
             "avg_memory_percent": sum(m.memory_percent for m in self.metrics) / len(self.metrics)
         }
+    
+    def is_available(self):
+        """
+        Return True if this node is available to execute jobs.
+        """
+        return self.status == "idle"   
+    
+    from datetime import datetime, UTC
+
+    def heartbeat(self):
+        """
+        Generate a heartbeat for this node.
+        """
+
+        return {
+            "node_id": self.node_id,
+            "status": self.status,
+            "timestamp": datetime.now(UTC)
+    }

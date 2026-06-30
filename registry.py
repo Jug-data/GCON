@@ -1,3 +1,4 @@
+
 class NodeRegistry:
     """
     Stores and manages GCON nodes.
@@ -13,7 +14,11 @@ class NodeRegistry:
         if node.node_id in self.nodes:
             raise ValueError(f"Node '{node.node_id}' already exists.")
 
-        self.nodes[node.node_id] = node
+        self.nodes[node.node_id] = {
+            "node": node,
+            "status": node.status,
+            "last_seen": datetime.now(UTC)
+}
 
     def remove(self, node_id):
         """
@@ -48,3 +53,15 @@ class NodeRegistry:
             for node in self.nodes.values()
             if node.status == "idle"
         ]
+        
+
+    def heartbeat(self, node_id, status):
+        """
+        Update heartbeat information for a node.
+        """
+
+        if node_id not in self.nodes:
+            raise ValueError(f"Node '{node_id}' does not exist.")
+
+        self.nodes[node_id]["last_seen"] = datetime.now(UTC)
+        self.nodes[node_id]["status"] = status
