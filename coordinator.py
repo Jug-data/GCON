@@ -1,3 +1,4 @@
+import time
 from agent import GCONAgent
 from receipt import ReceiptManager
 from verifier import ExecutionVerifier
@@ -17,6 +18,7 @@ class GCONCoordinator:
         self.agents = {}
         self.jobs = {}
         self.receipts = {}
+        self.heartbeats = {} 
         
         print("GCON Coordinator initialized.")
         
@@ -107,6 +109,11 @@ class GCONCoordinator:
         node_id = heartbeat["node_id"]
         status = heartbeat["status"]
 
+        self.heartbeats[node_id] = {
+            "status": status,
+            "last_seen": time.time()
+    }
+        
         self.registry.heartbeat(node_id, status)
 
         print(f"Heartbeat received from '{node_id}' ({status})")
