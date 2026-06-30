@@ -18,14 +18,9 @@ coordinator.register_agent(node1)
 coordinator.register_agent(node2)
 coordinator.register_agent(node3)
 
-heartbeat = node1.heartbeat()
-coordinator.receive_heartbeat(heartbeat)
-
-heartbeat = node2.heartbeat()
-coordinator.receive_heartbeat(heartbeat)
-
-heartbeat = node3.heartbeat()
-coordinator.receive_heartbeat(heartbeat)
+node1.start_heartbeat(coordinator)
+node2.start_heartbeat(coordinator)
+node3.start_heartbeat(coordinator)
 
 info = coordinator.registry.get_node_info("node-001")
 
@@ -65,15 +60,21 @@ for node_id in coordinator.registry.list_nodes():
     print(f"{node.job_id}: {node.status}")
 
 print("\n=== JOB STATUS ===")
-print(coordinator.get_job_status("job-001"))
+print(coordinator.get_job_status("job-001")) 
 
 print("\nStage 6 Scheduler Test Complete.")
 
+#
+print("\nStopping heartbeat for node-001...\n")
+node1.stop_heartbeat()
 
 import time
 
 print("\nWaiting for heartbeat timeout...")
 time.sleep(12)
+
+
+
 print("\n=== BEFORE HEALTH CHECK ===")
 
 for node_id in coordinator.registry.list_nodes():
@@ -85,7 +86,7 @@ for node_id in coordinator.registry.list_nodes():
     )
 
 
-coordinator.registry.check_node_health()
+coordinator.check_cluster_health()
 
 print("\n=== SCHEDULER FAILURE TEST ===")
 

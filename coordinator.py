@@ -62,21 +62,32 @@ class GCONCoordinator:
         if node is None:
             raise RuntimeError("No available nodes to execute the job.")
 
+    # Mark node and job as busy/running
         node.status = "busy"
+        job["status"] = "running"
+        job["agent"] = node.node_id
 
+    # Execute the job
         response = self.communication.send_job(
-        node.node_id,
-        job["command"]
-)
+            node.node_id,
+            job["command"]
+    )
+
         result = response["result"]
-        
+
+    # Mark node idle again
         node.status = "idle"
 
+    # Immediately update the coordinator with the new status
+        heartbeat = node.heartbeat()
+        self.receive_heartbeat(heartbeat)
+
+    # Job completed successfully
         job["status"] = "completed"
-        job["agent"] = node.node_id 
         job["result"] = result
 
         return result
+    
     
     def receive_receipt(self, job_id, receipt):
         """
@@ -100,6 +111,41 @@ class GCONCoordinator:
 
         return self.jobs[job_id]
     
+    def check_cluster_health(self):
+        """
+        Check node health and recover jobs from failed nodes.
+        """
+        offline_nodes = self.registry.check_node_health()
+
+        for node_id in offline_nodes:
+            print(f"Node '{node_id}' marked OFFLINE")
+            self.recover_jobs(node_id)
+    
+    def recover_jobs(self, node_id):
+        """
+        Recover unfinished jobs assigned to a failed node.
+        """
+
+        print(f"Recovering jobs from '{node_id}'...")
+
+        for job_id, job in self.jobs.items():
+
+            if job["agent"] == node_id and job["status"] != "running":
+
+                print(f"Recovering job '{job_id}'")
+
+            # Reset the job
+                job["status"] = "pending"
+                job["agent"] = None
+                self.assign_job(job_id)
+                
+            # Reassign the job
+                try:
+                    self.assign_job(job_id)
+                    print(f"Job '{job_id}' reassigned successfully.")
+                except RuntimeError as e:
+                     print(f"Recovery failed for '{job_id}': {e}")
+    
     
     def receive_heartbeat(self, heartbeat):
         """
@@ -115,6 +161,8 @@ class GCONCoordinator:
     }
         
         self.registry.heartbeat(node_id, status)
+        self.debug_heartbeats = False
+        if self.debug_heartbeats:
 
-        print(f"Heartbeat received from '{node_id}' ({status})")
+            print(f"Heartbeat received from '{node_id}' ({status})")
     

@@ -7,7 +7,8 @@ The agent:
 3. Records execution metrics
 4. Collects evidence for verification
 """
-
+import threading
+import time
 import os
 import sys
 import json
@@ -16,7 +17,6 @@ import subprocess
 import hashlib
 import psutil
 import logging
-from datetime import datetime, UTC
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime, UTC
@@ -62,6 +62,9 @@ class GCONAgent:
         self.end_time = None
         self.metrics = []
         self.process = None
+        
+        self.heartbeat_running = False
+        self.heartbeat_thread = None
         logger.info(f"GCON Agent initialized for node {node_id}")
     
     def detect_gpu(self) -> Dict[str, Any]:
@@ -240,3 +243,38 @@ class GCONAgent:
             "status": self.status,
             "timestamp": datetime.now(UTC)
     }
+     
+        
+    def start_heartbeat(self, coordinator, interval=2):
+        """
+        Start sending heartbeats periodically.
+        """
+        if self.heartbeat_running:
+            return
+        self.heartbeat_running = True
+
+         
+        def heartbeat_loop():
+           
+            while self.heartbeat_running:
+                 
+                coordinator.receive_heartbeat(self.heartbeat())
+
+                time.sleep(interval)
+
+        self.heartbeat_thread = threading.Thread(
+            target=heartbeat_loop,
+            daemon=True
+    )
+
+        self.heartbeat_thread.start() 
+        
+    def stop_heartbeat(self):
+        """
+        Stop sending heartbeats.
+        """
+
+        self.heartbeat_running = False
+
+        if self.heartbeat_thread is not None:
+            self.heartbeat_thread.join(timeout=1)

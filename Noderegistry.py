@@ -90,14 +90,21 @@ class NodeRegistry:
         """
         Mark nodes as offline if they have not sent
         a heartbeat within the timeout.
+
+        Returns:
+        list: IDs of nodes that became offline.
         """
 
         now = datetime.now(UTC)
+        offline_nodes = []
 
-        for info in self.nodes.values():
+        for node_id, info in self.nodes.items():
 
             elapsed = now - info["last_seen"]
 
-            if elapsed > self.timeout:
+            if elapsed > self.timeout and info["status"] != "offline":
+
                 info["status"] = "offline"
-            
+                offline_nodes.append(node_id)
+
+        return offline_nodes
