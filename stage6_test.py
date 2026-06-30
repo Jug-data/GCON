@@ -1,7 +1,7 @@
 from network import GCONNetwork
 from coordinator import GCONCoordinator
 from agent import GCONAgent
-
+from node import GCONNode
 
 print("=" * 60)
 print("        GCON STAGE 6 - SCHEDULING TEST")
@@ -13,10 +13,6 @@ coordinator = GCONCoordinator()
 node1 = GCONAgent("node-001")
 node2 = GCONAgent("node-002")
 node3 = GCONAgent("node-003")
-
-# --------------------------------------------------
-# Register nodes
-# --------------------------------------------------
 
 coordinator.register_agent(node1)
 coordinator.register_agent(node2)

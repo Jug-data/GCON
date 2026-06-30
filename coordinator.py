@@ -3,7 +3,7 @@ from receipt import ReceiptManager
 from verifier import ExecutionVerifier
 from Noderegistry import NodeRegistry
 from scheduler import Scheduler
-
+from communication import CommunicationManager
 
 class GCONCoordinator:
     """
@@ -13,21 +13,21 @@ class GCONCoordinator:
         self.network = network
         self.registry = NodeRegistry()
         self.scheduler = Scheduler(self.registry)
+        self.communication = CommunicationManager()
         self.agents = {}
         self.jobs = {}
         self.receipts = {}
+        
         print("GCON Coordinator initialized.")
         
-    def register_agent(self, agent):
+    def register_agent(self, node):
         """
         Register a GCON agent with the coordinator.
         """
-        if not isinstance(agent, GCONAgent):
-           raise TypeError("Expected a GCONAgent instance.")
-        self.agents[agent.job_id] = agent
-        self.registry.register(agent)
+        self.registry.register(node)
+        self.communication.register_node(node)
 
-        print(f"Agent '{agent.job_id}' registered successfully.")
+        print(f"Node '{node.node_id}' registered successfully.")
     
     def submit_job(self, job_id, command):
         """
@@ -62,7 +62,12 @@ class GCONCoordinator:
 
         node.status = "busy"
 
-        result = node.execute_job(job["command"])
+        response = self.communication.send_job(
+        node.node_id,
+        job["command"]
+)
+        result = response["result"]
+        
         node.status = "idle"
 
         job["status"] = "completed"

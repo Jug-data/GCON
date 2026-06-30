@@ -7,7 +7,7 @@ class GCONNode:
     """
 
     def __init__(self, node_id):
-        self.job_id = node_id
+        self.node_id = node_id
         self.agent = GCONAgent(node_id)
         self.status = "idle"
         self.current_job = None
