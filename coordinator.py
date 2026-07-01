@@ -13,12 +13,14 @@ class GCONCoordinator:
     def __init__(self, network=None):
         self.network = network
         self.registry = NodeRegistry()
+        self.nodes = {}
+        
         self.scheduler = Scheduler(self.registry)
         self.communication = CommunicationManager()
         self.agents = {}
+        
         self.jobs = {}
         self.receipts = {}
-        self.heartbeats = {} 
         
         print("GCON Coordinator initialized.")
         
@@ -70,6 +72,7 @@ class GCONCoordinator:
     # Execute the job
         response = self.communication.send_job(
             node.node_id,
+            job_id,
             job["command"]
     )
 
@@ -137,7 +140,7 @@ class GCONCoordinator:
             # Reset the job
                 job["status"] = "pending"
                 job["agent"] = None
-                self.assign_job(job_id)
+
                 
             # Reassign the job
                 try:
@@ -151,18 +154,14 @@ class GCONCoordinator:
         """
         Process a heartbeat received from a node.
         """
-
         node_id = heartbeat["node_id"]
         status = heartbeat["status"]
 
-        self.heartbeats[node_id] = {
-            "status": status,
-            "last_seen": time.time()
-    }
-        
-        self.registry.heartbeat(node_id, status)
-        self.debug_heartbeats = False
-        if self.debug_heartbeats:
+        self.registry.heartbeat(
+            heartbeat["node_id"],
+            heartbeat["status"],
+            heartbeat["timestamp"]
+        )
 
-            print(f"Heartbeat received from '{node_id}' ({status})")
+        print(f"Heartbeat received from {node_id} ({status})")
     

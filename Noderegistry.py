@@ -75,7 +75,7 @@ class NodeRegistry:
     
     from datetime import datetime, UTC
 
-    def heartbeat(self, node_id, status):
+    def heartbeat(self, node_id, status, timestamp):
         """
         Update heartbeat information for a node.
         """
@@ -83,7 +83,7 @@ class NodeRegistry:
         if node_id not in self.nodes:
             raise ValueError(f"Node '{node_id}' does not exist.")
 
-        self.nodes[node_id]["last_seen"] = datetime.now(UTC)
+        self.nodes[node_id]["last_seen"] = timestamp
         self.nodes[node_id]["status"] = status
         
     def check_node_health(self):

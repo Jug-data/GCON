@@ -23,19 +23,23 @@ class CommunicationManager:
 
         return self.nodes[node_id]
     
-    def send_job(self, node_id, command):
+    def send_job(self, node_id, job_id, command):
         """
         Send a job to a registered node for execution.
         """
 
         packet = {
         "node_id": node_id,
+        "job_id": job_id,
         "command": command
     }
         print(f"[COMM] Sending packet to {node_id}")
         node = self.get_node(packet["node_id"])
 
-        result = node.execute_job(packet["command"])
+        result = node.execute_job(           
+            packet["job_id"],
+            packet["command"]
+)
         print(f"[COMM] Response received from {node_id}")
         
         response = {

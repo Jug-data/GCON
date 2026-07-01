@@ -55,7 +55,7 @@ class GCONAgent:
         job_id: Unique identifier for the job
         """
         self.node_id= node_id
-        self.job_id = node_id
+    
         self.status ="idle"
         
         self.start_time = None
@@ -112,7 +112,7 @@ class GCONAgent:
             "temperature": 0
         }
     
-    def collect_metrics(self) -> ExecutionMetrics:
+    def collect_metrics(self, job_id) -> ExecutionMetrics:
         """
         Collect current system metrics during execution.
         
@@ -121,7 +121,7 @@ class GCONAgent:
         """
         gpu_info = self.detect_gpu()
         metrics = ExecutionMetrics(
-            job_id=self.job_id,
+            job_id=job_id,
             gpu_name=gpu_info.get("gpu_name", "Unknown"),
             gpu_memory_total=gpu_info.get("memory_total", 0),
             gpu_memory_used=gpu_info.get("memory_used", 0),
@@ -130,10 +130,11 @@ class GCONAgent:
             runtime_seconds=time.time() - self.start_time if self.start_time else 0,
             timestamp=datetime.now(UTC).isoformat()
         )
+        
         self.metrics.append(metrics)
         return metrics
     
-    def execute_job(self, job_script: str, timeout: Optional[int] = None) -> Dict[str, Any]:
+    def execute_job(self, job_id, job_script: str, timeout: Optional[int] = None) -> Dict[str, Any]:
         """
         Execute a job script and monitor execution.
         
@@ -147,6 +148,7 @@ class GCONAgent:
         logger.info(f"Starting job execution: {job_script}")
         self.start_time = time.time()
         self.status = "busy"
+        final_metrics = self.collect_metrics(job_id)
         
         try:
             # Determine if it's a file or command
@@ -170,10 +172,9 @@ class GCONAgent:
             self.end_time = time.time()
             
             runtime = self.end_time - self.start_time
-            final_metrics = self.collect_metrics()
-            
+                        
             result = {
-                "job_id": self.job_id,
+                "job_id": job_id,
                 "status": "success" if self.process.returncode == 0 else "failed",
                 "return_code": self.process.returncode,
                 "runtime_seconds": runtime,
@@ -185,6 +186,7 @@ class GCONAgent:
             
             logger.info(f"Job completed in {runtime:.2f}s with return code {self.process.returncode}")
             self.status = "idle"
+            
             return result
             
         except subprocess.TimeoutExpired:
@@ -193,7 +195,7 @@ class GCONAgent:
             self.end_time = time.time()
             self.status = "idle"
             return {
-                "job_id": self.job_id,
+                "job_id": job_id,
                 "status": "timeout",
                 "runtime_seconds": self.end_time - self.start_time,
                 "error": f"Execution timeout after {timeout}s",
@@ -204,7 +206,7 @@ class GCONAgent:
             self.end_time = time.time()
             self.status = "idle"
             return {
-                "job_id": self.job_id,
+                "job_id": job_id,
                 "status": "error",
                 "runtime_seconds": self.end_time - self.start_time,
                 "error": str(e),
@@ -217,7 +219,7 @@ class GCONAgent:
             return {"error": "No metrics collected"}
         
         return {
-            "job_id": self.job_id,
+            "job_id": job_id,
             "total_samples": len(self.metrics),
             "first_sample": self.metrics[0].to_dict(),
             "last_sample": self.metrics[-1].to_dict(),
@@ -225,7 +227,7 @@ class GCONAgent:
             "avg_memory_percent": sum(m.memory_percent for m in self.metrics) / len(self.metrics)
         }
     
-    def is_available(self):
+    def is_available(self,):
         """
         Return True if this node is available to execute jobs.
         """

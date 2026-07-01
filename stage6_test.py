@@ -57,7 +57,7 @@ print("\n=== NODE STATUS ===")
 
 for node_id in coordinator.registry.list_nodes():
     node = coordinator.registry.get_node(node_id)
-    print(f"{node.job_id}: {node.status}")
+    print(f"{node.node_id}: {node.status}")
 
 print("\n=== JOB STATUS ===")
 print(coordinator.get_job_status("job-001")) 
