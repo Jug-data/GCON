@@ -73,8 +73,12 @@ class JobRunner:
             logger.info(f"Input hash: {input_hash}")
         
         # Create and execute agent
-        agent = GCONAgent(job_id)
-        execution_result = agent.execute_job(job_script, timeout)
+        agent = GCONAgent("local-node")
+        execution_result = agent.execute_job(
+            job_id,
+            job_script,
+            timeout
+)
         
         # Calculate output hash
         output_hash = ""
@@ -125,7 +129,7 @@ class JobRunner:
         output_hash: str
     ) -> Dict[str, Any]:
         """Fallback receipt creation if manager doesn't have the method."""
-        from datetime import datetime
+        from datetime import datetime, UTC
         
         proof = self.verifier.generate_execution_proof(
             job_id=job_id,
@@ -137,14 +141,14 @@ class JobRunner:
         )
         
         return {
-            "receipt_id": self.verifier.hash_data(f"{job_id}-{datetime.utcnow().isoformat()}")[:16],
+            "receipt_id": self.verifier.hash_data(f"{job_id}-{datetime.now(UTC).isoformat()}")[:16],
             "job_id": job_id,
             "agent_id": self.agent_id,
             "status": execution_result.get("status", "unknown"),
             "input_hash": input_hash,
             "output_hash": output_hash,
             "proof": proof,
-            "issued_at": datetime.utcnow().isoformat()
+            "issued_at": datetime.now(UTC).isoformat()
         }
     
     def get_job_receipt(self, receipt_id: str) -> Optional[Dict[str, Any]]:

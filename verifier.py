@@ -11,7 +11,7 @@ The verifier:
 import hashlib
 import json
 import hmac
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, Any, Optional, Tuple
 import logging
 
@@ -149,7 +149,7 @@ class ExecutionVerifier:
             "runtime_seconds": runtime,
             "input_hash": input_hash,
             "output_hash": output_hash,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "metrics": metrics or {}
         }
         
@@ -190,7 +190,7 @@ class ExecutionVerifier:
         # Check timestamp is recent (within 24 hours)
         try:
             timestamp = datetime.fromisoformat(proof.get("timestamp", ""))
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             diff = (now - timestamp).total_seconds()
             if diff > 86400:  # 24 hours
                 return False, "Proof timestamp is too old"
@@ -221,7 +221,7 @@ class ExecutionVerifier:
             Complete receipt with proof
         """
         receipt = {
-            "receipt_id": self.hash_data(f"{job_id}-{datetime.utcnow().isoformat()}")[:16],
+            "receipt_id": self.hash_data(f"{job_id}-{datetime.now(UTC).isoformat()}")[:16],
             "job_id": job_id,
             "agent_id": agent_id,
             "status": execution_result.get("status", "unknown"),
@@ -235,7 +235,7 @@ class ExecutionVerifier:
                 output_hash=output_hash,
                 metrics=execution_result.get("metrics", {})
             ),
-            "issued_at": datetime.utcnow().isoformat()
+            "issued_at": datetime.now(UTC).isoformat()
         }
         
         logger.info(f"Receipt created: {receipt['receipt_id']} for job {job_id}")

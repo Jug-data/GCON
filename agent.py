@@ -199,7 +199,7 @@ class GCONAgent:
                 "status": "timeout",
                 "runtime_seconds": self.end_time - self.start_time,
                 "error": f"Execution timeout after {timeout}s",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
         except Exception as e:
             logger.error(f"Job execution failed: {e}")
