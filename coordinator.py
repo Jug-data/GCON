@@ -84,7 +84,10 @@ class GCONCoordinator:
     # Immediately update the coordinator with the new status
         heartbeat = node.heartbeat()
         self.receive_heartbeat(heartbeat)
-
+        
+        resources = node.report_resources()
+        self.receive_resource_report(resources)
+        
     # Job completed successfully
         job["status"] = "completed"
         job["result"] = result
@@ -165,3 +168,18 @@ class GCONCoordinator:
 
         print(f"Heartbeat received from {node_id} ({status})")
     
+    def receive_resource_report(self, resources):
+        """
+        Process a resource report received from a node.
+        """
+
+        node_id = resources["node_id"]
+
+        self.registry.update_node_resources(node_id, resources)
+
+        print(
+            f"Resources updated for {node_id} "
+            f"(CPU: {resources['cpu']}%, "
+            f"Memory: {resources['memory']}%, "
+            f"Jobs: {resources['running_jobs']})"
+    )

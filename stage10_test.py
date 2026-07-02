@@ -3,9 +3,9 @@ from coordinator import GCONCoordinator
 from agent import GCONAgent
 from node import GCONNode
 
-print("=" * 60)
-print("        GCON STAGE 6 - SCHEDULING TEST")
-print("=" * 60)
+print("=" * 70)
+print("        GCON STAGE 10 - RESOURCE MONITORING & LOAD SCHEDULING TEST")
+print("=" * 70)
 
 
 coordinator = GCONCoordinator()
@@ -21,6 +21,28 @@ coordinator.register_agent(node3)
 node1.start_heartbeat(coordinator)
 node2.start_heartbeat(coordinator)
 node3.start_heartbeat(coordinator)
+
+print("\n=== RESOURCE REPORTS ===")
+
+for node in [node1, node2, node3]:
+    resources = node.report_resources()
+    coordinator.receive_resource_report(resources)
+
+    print(
+        node.node_id,
+        "| CPU =", resources["cpu"],
+        "| Memory =", resources["memory"],
+        "| Jobs =", resources["running_jobs"]
+    )
+
+coordinator.registry.nodes["node-001"]["cpu"] = 70
+coordinator.registry.nodes["node-001"]["memory"] = 80
+
+coordinator.registry.nodes["node-002"]["cpu"] = 25
+coordinator.registry.nodes["node-002"]["memory"] = 40
+
+coordinator.registry.nodes["node-003"]["cpu"] = 10
+coordinator.registry.nodes["node-003"]["memory"] = 20
 
 info = coordinator.registry.get_node_info("node-001")
 
@@ -101,6 +123,16 @@ try:
 except RuntimeError as e:
     print(e)
 
+
+print("\n=== LOAD-BASED SCHEDULER TEST ===")
+
+selected = coordinator.scheduler.select_node()
+
+print(f"Scheduler selected: {selected.node_id}")
+
+assert selected.node_id == "node-003"
+
+print("PASS: Scheduler selected the least-loaded node.")
 print("\n=== AFTER HEALTH CHECK ===")
 
 for node_id in coordinator.registry.list_nodes():

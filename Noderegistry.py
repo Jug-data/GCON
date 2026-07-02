@@ -21,8 +21,14 @@ class NodeRegistry:
         self.nodes[node.node_id] = {
             "node": node,
             "last_seen": datetime.now(UTC),
-            "status": node.status
-    }
+            "status": node.status,
+            
+            "cpu": 0.0,
+            "memory": 0.0,
+            "running_jobs": 0,
+            "resource_timestamp": None
+            
+}
         
     def remove(self, node_id):
         """
@@ -108,3 +114,20 @@ class NodeRegistry:
                 offline_nodes.append(node_id)
 
         return offline_nodes
+    
+    
+    def update_node_resources(self, node_id, resources):
+        """
+        Update the latest resource information for a node.
+        """
+
+        if node_id not in self.nodes:
+            raise ValueError(f"Node '{node_id}' does not exist.")
+
+        info = self.nodes[node_id]
+
+        info["cpu"] = resources["cpu"]
+        info["memory"] = resources["memory"]
+        info["running_jobs"] = resources["running_jobs"]
+        info["resource_timestamp"] = resources["timestamp"]
+        info["status"] = resources["status"]

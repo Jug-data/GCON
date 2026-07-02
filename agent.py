@@ -20,6 +20,7 @@ import logging
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime, UTC
+from monitor import ResourceMonitor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,15 +55,15 @@ class GCONAgent:
         Args:
         job_id: Unique identifier for the job
         """
-        self.node_id= node_id
-    
-        self.status ="idle"
-        
+        self.node_id= node_id   
+        self.status ="idle"       
         self.start_time = None
+        
         self.end_time = None
         self.metrics = []
         self.process = None
         
+        self.monitor = ResourceMonitor(self)
         self.heartbeat_running = False
         self.heartbeat_thread = None
         logger.info(f"GCON Agent initialized for node {node_id}")
@@ -148,7 +149,7 @@ class GCONAgent:
         logger.info(f"Starting job execution: {job_script}")
         self.start_time = time.time()
         self.status = "busy"
-        final_metrics = self.collect_metrics(job_id)
+        
         
         try:
             # Determine if it's a file or command
@@ -172,7 +173,7 @@ class GCONAgent:
             self.end_time = time.time()
             
             runtime = self.end_time - self.start_time
-                        
+            final_metrics = self.collect_metrics(job_id)            
             result = {
                 "job_id": job_id,
                 "status": "success" if self.process.returncode == 0 else "failed",
@@ -219,7 +220,7 @@ class GCONAgent:
             return {"error": "No metrics collected"}
         
         return {
-            "job_id": job_id,
+            "node_id": self.node_id,
             "total_samples": len(self.metrics),
             "first_sample": self.metrics[0].to_dict(),
             "last_sample": self.metrics[-1].to_dict(),
@@ -280,3 +281,9 @@ class GCONAgent:
 
         if self.heartbeat_thread is not None:
             self.heartbeat_thread.join(timeout=1)
+            
+    def report_resources(self):
+        """
+        Return the current node resource usage.
+        """
+        return self.monitor.collect()

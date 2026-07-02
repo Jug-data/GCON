@@ -65,3 +65,18 @@ class NodeRegistry:
 
         self.nodes[node_id]["last_seen"] = datetime.now(UTC)
         self.nodes[node_id]["status"] = status
+        
+    
+    def update_node_resources(self, node_id, resources):
+        """
+        Update the latest resource metrics for a node.
+        """
+
+        if node_id not in self.nodes:
+            raise ValueError(f"Node '{node_id}' is not registered.")
+
+        self.nodes[node_id]["cpu"] = resources["cpu"]
+        self.nodes[node_id]["memory"] = resources["memory"]
+        self.nodes[node_id]["running_jobs"] = resources["running_jobs"]
+        self.nodes[node_id]["status"] = resources["status"]
+        self.nodes[node_id]["resource_timestamp"] = resources["timestamp"]

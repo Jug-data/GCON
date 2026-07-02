@@ -16,18 +16,29 @@ class Scheduler:
 
     def select_node(self):
         """
-        Select the next available node.
-
-        Returns:
-            GCONAgent: An idle node, or None if no nodes are available.
+        Select the least-loaded idle node.
         """
 
-        available = self.registry.available_nodes()
+        best_node = None
+        lowest_score = float("inf")
 
-        if not available:
-            return None
+        for info in self.registry.nodes.values():
 
-        return available[0]
+            if info["status"] != "idle":
+                continue
+
+            score = (
+                info["cpu"] * 0.5 +
+                info["memory"] * 0.3 +
+                info["running_jobs"] * 20
+        )
+        
+            if score < lowest_score:
+                lowest_score = score
+                best_node = info["node"]
+
+        return best_node
+    
 
     def has_available_node(self):
         """
@@ -44,4 +55,4 @@ class Scheduler:
         Return the number of registered nodes.
         """
 
-        return len(self.registry.list_nodes())
+        return self.select_node() is not None
