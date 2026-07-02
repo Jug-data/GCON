@@ -2,6 +2,8 @@ from network import GCONNetwork
 from coordinator import GCONCoordinator
 from agent import GCONAgent
 from node import GCONNode
+from metrics import MetricsCollector, MetricsSummary
+from dashboard import Dashboard
 
 print("=" * 70)
 print("        GCON STAGE 10 - RESOURCE MONITORING & LOAD SCHEDULING TEST")
@@ -44,6 +46,10 @@ coordinator.registry.nodes["node-002"]["memory"] = 40
 coordinator.registry.nodes["node-003"]["cpu"] = 10
 coordinator.registry.nodes["node-003"]["memory"] = 20
 
+selected = coordinator.scheduler.select_node()
+
+assert selected.node_id == "node-003"
+
 info = coordinator.registry.get_node_info("node-001")
 
 print("\n=== HEARTBEAT TEST ===")
@@ -61,7 +67,7 @@ print(coordinator.registry.list_nodes())
 
 coordinator.submit_job(
     "job-001",
-    "echo Stage 6 Scheduler Working"
+    " GCON STAGE 10 - RESOURCE MONITORING & LOAD SCHEDULING TEST    Working"
 )
 
 print("\nSubmitting job...")
@@ -84,7 +90,7 @@ for node_id in coordinator.registry.list_nodes():
 print("\n=== JOB STATUS ===")
 print(coordinator.get_job_status("job-001")) 
 
-print("\nStage 6 Scheduler Test Complete.")
+print("\nGCONSTAGE 10 - RESOURCE MONITORING & LOAD SCHEDULING TEST Complete.")
 
 #
 print("\nStopping heartbeat for node-001...\n")
@@ -124,15 +130,16 @@ except RuntimeError as e:
     print(e)
 
 
-print("\n=== LOAD-BASED SCHEDULER TEST ===")
+print("\n=== FAILOVER SCHEDULER TEST ===")
 
 selected = coordinator.scheduler.select_node()
 
 print(f"Scheduler selected: {selected.node_id}")
 
-assert selected.node_id == "node-003"
+assert selected.node_id != "node-001"
 
-print("PASS: Scheduler selected the least-loaded node.")
+print("PASS: Offline node was ignored.")
+
 print("\n=== AFTER HEALTH CHECK ===")
 
 for node_id in coordinator.registry.list_nodes():
@@ -150,3 +157,33 @@ for node_id in coordinator.registry.list_nodes():
     info = coordinator.registry.get_node_info(node_id)
 
     print(node_id, "->", info["status"])
+    
+collector = MetricsCollector(coordinator)
+
+print("\n=== NODE METRICS ===")
+print(collector.collect_node_metrics())
+
+print("\n=== JOB METRICS ===")
+print(collector.collect_job_metrics())
+
+collector = MetricsCollector(coordinator)
+
+node_metrics = collector.collect_node_metrics()
+job_metrics = collector.collect_job_metrics()
+
+summary = MetricsSummary(node_metrics, job_metrics)
+
+print("\n=== NODE SUMMARY ===")
+print(summary.summarize_nodes())
+
+print("\n=== JOB SUMMARY ===")
+print(summary.summarize_jobs())
+
+print("\n=== RESOURCE SUMMARY ===")
+print(summary.summarize_resources())
+
+print("\n=== CLUSTER SUMMARY ===")
+print(summary.cluster_summary())
+
+print("\n=== DASHBOARD ===")
+coordinator.dashboard()

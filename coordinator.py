@@ -5,6 +5,8 @@ from verifier import ExecutionVerifier
 from Noderegistry import NodeRegistry
 from scheduler import Scheduler
 from communication import CommunicationManager
+from metrics import MetricsCollector, MetricsSummary
+from dashboard import Dashboard
 
 class GCONCoordinator:
     """
@@ -77,6 +79,10 @@ class GCONCoordinator:
     )
 
         result = response["result"]
+        {
+        "status": "success",
+    
+        }     
 
     # Mark node idle again
         node.status = "idle"
@@ -89,9 +95,16 @@ class GCONCoordinator:
         self.receive_resource_report(resources)
         
     # Job completed successfully
-        job["status"] = "completed"
-        job["result"] = result
+        # 
+        if result["status"] == "success":
+            job["status"] = "completed"
+        else:
+            job["status"] = "failed"
 
+        job["result"] = result
+        
+        
+        
         return result
     
     
@@ -183,3 +196,13 @@ class GCONCoordinator:
             f"Memory: {resources['memory']}%, "
             f"Jobs: {resources['running_jobs']})"
     )
+        
+    def dashboard(self):
+        collector = MetricsCollector(self)
+        node_metrics = collector.collect_node_metrics()
+        job_metrics = collector.collect_job_metrics()
+
+        summary = MetricsSummary(node_metrics, job_metrics)
+
+        dashboard = Dashboard(collector, summary)
+        dashboard.display()
